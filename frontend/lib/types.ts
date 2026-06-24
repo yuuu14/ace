@@ -82,7 +82,7 @@ export interface SavingsReport {
 }
 
 export interface TraceLine {
-  source: "ACE Console" | "Calculus" | "Lookup" | "Match" | "Payment" | "Complete" | "Error";
+  source: "ACE Console" | "Calculus" | "Lookup" | "Match" | "Payment" | "Complete" | "Execution" | "Error";
   text: string;
   highlight?: "rose" | "mint" | "cyan" | "muted";
 }

@@ -48,15 +48,15 @@ export function buildResolveTrace(
 export function buildExecutionTrace(): TraceLine[] {
   return [
     {
-      source: "ACE Console",
+      source: "Execution",
       text: "Executing Step 1 -> invalid_nonce encountered -> Syncing nonce from Arc on-chain state...",
     },
     {
-      source: "ACE Console",
+      source: "Execution",
       text: "Executing Step 2 -> transaction_dropped == true -> Sequencing fallback RPC...",
     },
     {
-      source: "ACE Console",
+      source: "Execution",
       text: "Executing Step 3 -> spend_limit_exceeded == true -> Generating limit reset policy...",
     },
     {

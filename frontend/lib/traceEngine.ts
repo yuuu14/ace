@@ -6,7 +6,7 @@ export const phaseConfig = [
   { key: "reasoning", label: "Cost Model", sources: ["Calculus"] as const, color: "amber" },
   { key: "registry", label: "Market Match", sources: ["Lookup", "Match"] as const, color: "violet" },
   { key: "payment", label: "x402", sources: ["Payment"] as const, color: "cyan" },
-  { key: "execution", label: "Execution", sources: ["Complete"] as const, color: "mint" },
+  { key: "execution", label: "Execution", sources: ["Execution", "Complete"] as const, color: "mint" },
 ] as const;
 
 type PhaseColor = (typeof phaseConfig)[number]["color"];
@@ -19,6 +19,7 @@ export const sourceLabels: Record<TraceLine["source"], string> = {
   Match: "MATCH",
   Payment: "X402",
   Complete: "DONE",
+  Execution: "EXEC",
   Error: "ERR",
 };
 
@@ -29,6 +30,7 @@ export const sourceRoles: Record<TraceLine["source"], string> = {
   Lookup: "Registry Scan",
   Match: "Market Match",
   Payment: "x402 Payment",
+  Execution: "Execution",
   Complete: "Execution",
   Error: "Error",
 };
@@ -267,6 +269,20 @@ export function classifyState(
     };
   }
 
+  // Execution
+  if (line.source === "Execution") {
+    return {
+      index,
+      label: "Execution",
+      color: "mint",
+      title: "Recovery steps executing",
+      summary: "The agent is executing the purchased decision tree steps.",
+      metric: "Steps: nonce sync → RPC fallback → limit reset",
+      next: "Complete recovery and record settlement.",
+      source: line.source,
+    };
+  }
+
   // Complete
   if (line.source === "Complete") {
     return {
@@ -328,6 +344,7 @@ export function evidenceBorderClass(source: TraceLine["source"]): string {
     Lookup: "border-violet-300/25 bg-violet-400/5",
     Match: "border-violet-300/35 bg-violet-400/10",
     Payment: "border-cyan-300/35 bg-cyan-400/10",
+    Execution: "border-emerald-300/35 bg-emerald-400/10",
     Complete: "border-emerald-300/35 bg-emerald-400/10",
     Error: "border-rose-400/40 bg-rose-500/15",
   };
