@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Link from "next/link";
 
 import CapabilityRegistry from "@/components/CapabilityRegistry";
 import IncidentSandbox from "@/components/IncidentSandbox";
@@ -25,6 +26,12 @@ export default function Home() {
           </p>
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
+          <Link
+            href="/history"
+            className="rounded border border-ace-border bg-ace-panel px-2 py-1 text-[10px] text-zinc-300 transition hover:border-zinc-500 hover:text-zinc-100 sm:px-3 sm:py-1.5 sm:text-xs"
+          >
+            History
+          </Link>
           {/* Reset button — only visible when there's trace history */}
           {trace.length > 0 && (
             <button
