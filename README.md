@@ -19,10 +19,10 @@ ace/
 ```bash
 cd ace/backend
 uv sync
-uv run uvicorn app.main:app --reload
+uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-The API will be available at `http://127.0.0.1:8000`.
+The API will be available at `http://localhost:8000`.
 
 ### Frontend
 
@@ -32,13 +32,12 @@ npm install
 npm run dev
 ```
 
-The dashboard will be available at `http://localhost:3002` (port 3002 is used to avoid conflicts with scrobblepay on 3000/3001).
+The dashboard will be available at `http://localhost:3002`.
 
 ## Nanopayment Flow
 
 ACE uses the **Circle x402** protocol (HTTP 402 Payment Required) with **EIP-712**
-`TransferWithAuthorization` signing, matching the implementation in
-[`scrobblepay`](https://github.com/your-org/scrobblepay):
+`TransferWithAuthorization` signing:
 
 1. `GET /capabilities/{id}/download` returns **HTTP 402** with a base64
    `PAYMENT-REQUIRED` challenge.
