@@ -14,6 +14,10 @@ import {
   borderBgClass,
   evidenceBorderClass,
 } from "@/lib/traceEngine";
+import TraceTimeline from "@/components/TraceTimeline";
+import AgentThinkingPanel from "@/components/AgentThinkingPanel";
+import RoiHero from "@/components/RoiHero";
+import { useAceStore } from "@/store/useAceStore";
 
 interface Props {
   lines: TraceLine[];
@@ -45,6 +49,7 @@ export default function TraceConsole({ lines }: Props) {
     [groups, lines],
   );
   const curState = stateEvents[safeGroupIndex] ?? stateEvents.at(-1);
+  const liveAnalysis = useAceStore((s) => s.liveAnalysis);
 
   // Sync cursor to latest group
   useEffect(() => {
@@ -65,6 +70,7 @@ export default function TraceConsole({ lines }: Props) {
 
   const matchSeen = lines.some((l) => l.source === "Match");
   const costSeen = lines.some((l) => l.source === "Calculus" && l.text.includes("Estimated Direct Cost"));
+  const roiSeen = lines.some((l) => l.source === "Calculus" && l.text.includes("ROI Decision"));
   const paymentSeen = lines.some((l) => l.source === "Payment");
   const paymentSettled = lines.some((l) => l.text.includes("Authorization accepted"));
   const resolved = lines.some((l) => l.source === "Complete");
@@ -110,6 +116,8 @@ export default function TraceConsole({ lines }: Props) {
 
       {/* State + evidents */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-3">
+        <TraceTimeline lines={lines} />
+
         {/* Live Agent State card */}
         <div
           className="mb-3 rounded border border-ace-border bg-gradient-to-r from-[#14101d] via-[#0c1220] to-[#091713] p-3"
@@ -186,41 +194,27 @@ export default function TraceConsole({ lines }: Props) {
           </div>
         </div>
 
+        {/* Agent reasoning (LLM live analysis) */}
+        <AgentThinkingPanel
+          summary={liveAnalysis?.summary}
+          rationale={liveAnalysis?.rationale}
+          confidence={liveAnalysis?.confidence}
+          provider={liveAnalysis?.provider}
+        />
+
+        {/* ROI hero — promoted from the old Economic Decision tile */}
+        {(costSeen || roiSeen) && (
+          <RoiHero
+            directCost={directCost}
+            packPrice={packPrice}
+            savingsPct={savingsPct}
+            resolved={resolved}
+          />
+        )}
+
         {/* Detail cards */}
         {hasDetail && (
           <div className="mb-4 grid grid-cols-1 content-start gap-3 lg:grid-cols-2">
-            {costSeen && (
-              <section
-                className="rounded border border-amber-300/30 bg-amber-400/10 p-3"
-                aria-label="Economic decision"
-              >
-                <div className="mb-3 text-[10px] font-semibold uppercase tracking-wide text-ace-muted">
-                  Economic Decision
-                </div>
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  {[
-                    { label: "Direct", value: directCost, color: "text-ace-rose" },
-                    { label: "Pack", value: packPrice, color: "text-ace-cyan" },
-                    { label: "Saved", value: savingsPct, color: "text-ace-mint" },
-                  ].map(({ label, value, color }) => (
-                    <div key={label} className="rounded bg-black/40 p-2">
-                      <div className="text-[10px] text-zinc-500">{label}</div>
-                      <div className={`text-sm font-semibold ${color}`}>{value}</div>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-3 h-2 overflow-hidden rounded bg-ace-bg">
-                  <div
-                    className="h-full w-[92%] bg-gradient-to-r from-amber-300 to-emerald-300"
-                    role="progressbar"
-                    aria-valuenow={92}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-label="Cost savings progress"
-                  />
-                </div>
-              </section>
-            )}
 
             {matchSeen && (
               <section

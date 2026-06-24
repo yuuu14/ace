@@ -7,9 +7,17 @@ import type {
 } from "@/lib/types";
 import { listCapabilities, getCapability, listLedger, getSavings } from "@/lib/api";
 
+export interface LiveAnalysis {
+  summary?: string | null;
+  rationale?: string | null;
+  confidence?: number | null;
+  provider?: string | null;
+}
+
 interface AceState {
   // Data
   capabilities: CapabilitySummary[];
+  liveAnalysis: LiveAnalysis | null;
   selectedCapability: Capability | null;
   trace: TraceLine[];
   ledger: LedgerEntry[];
@@ -33,6 +41,7 @@ interface AceState {
   clearTrace: () => void;
   setLedger: (ledger: LedgerEntry[]) => void;
   setSavings: (savings: AceState["savings"]) => void;
+  setLiveAnalysis: (v: LiveAnalysis | null) => void;
   setLoading: (key: keyof AceState["loading"], value: boolean) => void;
   setError: (key: keyof AceState["error"], value: string | null) => void;
   setAlert: (alert: boolean) => void;
@@ -54,6 +63,7 @@ export const useAceStore = create<AceState>((set, get) => ({
   trace: [],
   ledger: [],
   savings: null,
+  liveAnalysis: null,
   loading: { ...initialLoading },
   error: { ...initialError },
   alert: false,
@@ -77,9 +87,10 @@ export const useAceStore = create<AceState>((set, get) => ({
     set((state) => ({
       trace: [...state.trace, ...lines].slice(-MAX_TRACE),
     })),
-  clearTrace: () => set({ trace: [], alert: false, showPaymentOverlay: false }),
+  clearTrace: () => set({ trace: [], liveAnalysis: null, alert: false, showPaymentOverlay: false }),
   setLedger: (ledger) => set({ ledger }),
   setSavings: (savings) => set({ savings }),
+  setLiveAnalysis: (liveAnalysis) => set({ liveAnalysis }),
   setLoading: (key, value) =>
     set((state) => ({ loading: { ...state.loading, [key]: value } })),
   setError: (key, value) =>
@@ -121,6 +132,7 @@ export const useAceStore = create<AceState>((set, get) => ({
     set({
       trace: [],
       selectedCapability: null,
+      liveAnalysis: null,
       alert: false,
       showPaymentOverlay: false,
       error: { ...initialError },

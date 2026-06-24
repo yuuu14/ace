@@ -24,6 +24,7 @@ export default function IncidentSandbox() {
     setShowPaymentOverlay,
     setLedger,
     setSavings,
+    setLiveAnalysis,
     setError,
     error,
   } = useAceStore();
@@ -78,6 +79,13 @@ export default function IncidentSandbox() {
         "Error: CLI execution limit exceeded on stablecoin transfer",
       );
       const cap = capabilities.find((c) => c.id === response.capability_id);
+      if (response.live_analysis) {
+        setLiveAnalysis({
+          summary: response.live_analysis.summary,
+          rationale: response.live_analysis.rationale,
+          confidence: response.live_analysis.confidence,
+        });
+      }
       appendTrace(buildResolveTrace(response, cap?.objective));
 
       if (response.accepted && response.capability_id) {
