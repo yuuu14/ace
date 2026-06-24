@@ -1,0 +1,66 @@
+# ========================================
+# ACE — Unified .gitignore
+# ========================================
+
+# ---- Environment files (keep .env.example tracked) ----
+.env
+.env.local
+.env.*.local
+
+# ---- OS / Editor ----
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ---- Backend (Python / uv) ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+ENV/
+*.egg-info/
+.eggs/
+build/
+dist/
+wheels/
+*.egg
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+noxfile.py
+
+# Generated runtime data
+backend/data/ace.db
+backend/data/*.db-journal
+
+# ---- Frontend (Next.js / Node) ----
+node_modules/
+.next/
+out/
+dist/
+*.tsbuildinfo
+.eslintcache
+.turbo/
+.vercel/
+
+# ---- Logs ----
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ---- Misc ----
+*.pem
+.cache/

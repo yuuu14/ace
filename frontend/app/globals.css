@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+:root {
+  --ace-bg: #09090b;
+  --ace-panel: #0f0f12;
+  --ace-border: #27272a;
+  --ace-rose: #f43f5e;
+  --ace-mint: #10b981;
+  --ace-cyan: #06b6d4;
+  --ace-muted: #a1a1aa;
+}
+
+html,
+body {
+  background-color: var(--ace-bg);
+  color: #e4e4e7;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--ace-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--ace-border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3f3f46;
+}
+
+.glass {
+  background: rgba(15, 15, 18, 0.72);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--ace-border);
+}
+
+.terminal-line {
+  animation: fadeIn 0.2s ease-out both;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-red {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(244, 63, 94, 0);
+  }
+  50% {
+    box-shadow: 0 0 24px 4px rgba(244, 63, 94, 0.35);
+  }
+}
+
+.alert-glow {
+  animation: pulse-red 1.5s ease-in-out infinite;
+}

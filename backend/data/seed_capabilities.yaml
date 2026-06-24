@@ -1,0 +1,41 @@
+capability:
+  id: "cap_circle_lockout_recovery"
+  version: "1.0.0"
+  objective: "Recover and reset Circle wallet spending limits under OTP-dropped concurrency lockouts"
+  category: "RECOVERY"
+  price_usdc: 0.0020
+
+  trigger_signatures:
+    - error_code: "402_LIMIT_EXCEEDED"
+    - terminal_log_pattern: "Error: CLI execution limit exceeded on stablecoin transfer"
+
+  provenance_metrics:
+    experience_sources:
+      - chaos_test_runs
+      - replayed_failure_scenarios
+    sample_runs_analyzed: 15
+    average_latency_reduction_pct: 88.0
+    direct_token_saving_pct: 96.0
+
+  decision_points:
+    - condition: "wallet_status == SESSION_LOCKED"
+      action: "fetch_monotonic_nonce"
+      failsafe: "reset_local_nonce_to_onchain"
+
+    - condition: "last_execution_error == invalid_nonce"
+      action: "force_sync_block_header"
+
+    - condition: "transaction_dropped == true"
+      action: "sequence_traverse_fallback_rpc"
+
+    - condition: "spend_limit_exceeded == true"
+      action: "generate_limit_reset_policy"
+      params:
+        per_tx: 1
+        daily: 5
+      security_policy: "delegate_otp_to_admin_without_storing_in_agent_memory"
+
+  attestation:
+    auditor_address: "0x000000000000000000000000000000000000ACE1"
+    timestamp: 1782297600
+    signature: "0x48f57fa673e13d9a1c120bf39da128ae3901bc97fa0e39c6395ba7f230da1d0172"
