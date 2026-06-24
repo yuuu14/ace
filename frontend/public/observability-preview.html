@@ -510,18 +510,21 @@ const el=s=>document.getElementById(s);
    RENDER
    ===================================================================== */
 function renderTimeline(){
-  el("timeline").innerHTML=PHASES.map(p=>{
-    // status from furthest revealed span in this phase
-    const idx=RUN.filter(s=>s.phase===p.key).map((_,i)=>i);
+  // Only show phases that have actually started (current + past).
+  // Future phases are never pre-rendered — the trace unfolds, it isn't a pipeline.
+  const started=PHASES.filter(p=>RUN.slice(0,step).some(s=>s.phase===p.key));
+  if(started.length===0){
+    el("timeline").innerHTML=`<div class="phase" data-st="pending" style="flex:1"><span class="node"></span><span class="meta"><span class="pl">Awaiting incident</span><span class="pn">Press Trigger to begin</span></span></div>`;
+    return;
+  }
+  el("timeline").innerHTML=started.map(p=>{
     const seen=RUN.slice(0,step).filter(s=>s.phase===p.key).length;
     const total=RUN.filter(s=>s.phase===p.key).length;
-    const isDone=seen>0 && seen>=total;
-    const isActive=seen>0 && !isDone;
-    const st=isDone?"done":isActive?"active":"pending";
+    const st=seen>=total?"done":"active";
     return `<div class="phase" data-phase="${p.key}" data-color="${p.color}" data-st="${st}" onclick="jumpPhase('${p.key}')">
       <span class="node"></span>
       <span class="meta"><span class="pl">${p.label}</span><span class="pn">${p.short}</span></span>
-      <span class="lat">${seen}/${total||'·'}</span>
+      <span class="lat">${seen}/${total}</span>
     </div>`;
   }).join("");
 }
@@ -529,30 +532,31 @@ function renderTimeline(){
 function renderSpans(){
   const host=el("spans");
   host.innerHTML="";
-  for(let i=0;i<RUN.length;i++){
+  // Only render spans that have happened (i < step). No pending/future
+  // placeholders — the list grows as the agent advances, live and on scrub-back.
+  if(step===0){
+    host.innerHTML=`<div class="span empty"><div class="sh"><span class="stitle" style="color:var(--faint)">No events yet — press Trigger to start the agent run.</span></div></div>`;
+    return;
+  }
+  for(let i=0;i<step;i++){
     const s=RUN[i];
-    const revealed=i<step;
     const div=document.createElement("div");
-    div.className="span"+(revealed?(i===step-1?" active open":""):" empty");
+    div.className="span"+(i===step-1?" active open":"");
     div.setAttribute("data-color",s.color);
     div.setAttribute("data-i",i);
-    if(!revealed){
-      div.innerHTML=`<div class="sh"><span class="srole">${s.role}</span><span class="stitle" style="color:var(--faint)">pending…</span></div>`;
-    }else{
-      let det=`<div class="sh" onclick="toggleSpan(${i})">
-        <span class="srole">${s.role}</span>
-        <span class="stitle">${s.title}</span>
-        <span class="smetric">${s.metric}</span>
-        <span class="slat">${s.lat}ms</span>
-      </div><div class="sdet">`;
-      if(s.detail){
-        det+=`<div class="kv">`+Object.entries(s.detail).map(([k,v])=>`<span class="k">${k}</span><span class="v">${typeof v==='object'?'<span class="muted">'+v+'</span>':v}</span>`).join("")+`</div>`;
-      }
-      if(s.in) det+=`<div class="json">// input${json(s.in)}</div>`;
-      if(s.out) det+=`<div class="json">// output${json(s.out)}</div>`;
-      det+=`</div>`;
-      div.innerHTML=det;
+    let det=`<div class="sh" onclick="toggleSpan(${i})">
+      <span class="srole">${s.role}</span>
+      <span class="stitle">${s.title}</span>
+      <span class="smetric">${s.metric}</span>
+      <span class="slat">${s.lat}ms</span>
+    </div><div class="sdet">`;
+    if(s.detail){
+      det+=`<div class="kv">`+Object.entries(s.detail).map(([k,v])=>`<span class="k">${k}</span><span class="v">${typeof v==='object'?'<span class="muted">'+v+'</span>':v}</span>`).join("")+`</div>`;
     }
+    if(s.in) det+=`<div class="json">// input${json(s.in)}</div>`;
+    if(s.out) det+=`<div class="json">// output${json(s.out)}</div>`;
+    det+=`</div>`;
+    div.innerHTML=det;
     host.appendChild(div);
   }
 }
