@@ -1,0 +1,747 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ACE — Agent Capability Exchange · Observability Console</title>
+<style>
+/* =====================================================================
+   ACE — agent observability console (redesign)
+   Direction: tech / utility (dark) — faithful to ace's real identity.
+   All color literals live in :root; the body uses var(--*) tokens only.
+   ===================================================================== */
+:root{
+  --bg:#09090b; --surface:#0f0f12; --surface-2:#131318; --raised:#17171c;
+  --border:#27272a; --border-soft:#1e1e22;
+  --fg:#e4e4e7; --muted:#a1a1aa; --muted-2:#71717a; --faint:#52525b;
+
+  /* semantic / status (these are the feature, not decorative accent) */
+  --rose:#f43f5e; --amber:#fbbf24; --violet:#a78bfa; --cyan:#06b6d4; --mint:#10b981;
+
+  /* tints (rgba from same hex) */
+  --rose-12:rgba(244,63,94,.14); --amber-12:rgba(251,191,36,.12);
+  --violet-12:rgba(167,139,250,.12); --cyan-12:rgba(6,182,212,.12); --mint-12:rgba(16,185,129,.14);
+
+  --font-mono:'JetBrains Mono','IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;
+  --font-body:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--bg);color:var(--fg);
+  font-family:var(--font-mono);font-size:13px;line-height:1.5;
+  font-variant-numeric:tabular-nums;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+  overflow:hidden;
+}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:5px}
+::-webkit-scrollbar-thumb:hover{background:#3f3f46}
+
+.app{display:grid;grid-template-rows:auto auto 1fr;height:100vh}
+
+/* ---------- top bar ---------- */
+.topbar{display:flex;align-items:center;gap:18px;padding:12px 18px;border-bottom:1px solid var(--border);background:var(--surface)}
+.brand{display:flex;align-items:baseline;gap:10px}
+.brand .mark{font-size:15px;font-weight:600;letter-spacing:-.01em}
+.brand .tag{font-size:10px;color:var(--muted-2);text-transform:uppercase;letter-spacing:.14em}
+.runtime{display:flex;gap:6px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;color:var(--muted);
+  border:1px solid var(--border);background:var(--surface-2);padding:4px 9px;border-radius:5px;letter-spacing:.02em}
+.chip b{color:var(--fg);font-weight:500}
+.chip .dot{width:6px;height:6px;border-radius:50%;background:var(--mint)}
+.topbar .spacer{flex:1}
+.savings-hero{display:flex;align-items:baseline;gap:8px;padding-right:16px;border-right:1px solid var(--border)}
+.savings-hero .k{font-size:10px;color:var(--muted-2);text-transform:uppercase;letter-spacing:.12em}
+.savings-hero .v{font-size:22px;font-weight:600;color:var(--mint);letter-spacing:-.02em}
+.savings-hero .v .u{font-size:11px;color:var(--muted);font-weight:400;margin-left:3px;letter-spacing:0}
+.btn{font-family:var(--font-mono);font-size:12px;font-weight:500;letter-spacing:.02em;
+  border:1px solid var(--rose);background:var(--rose);color:#fff;padding:8px 14px;border-radius:6px;cursor:pointer;
+  transition:transform .12s,background .15s;white-space:nowrap}
+.btn:hover{background:#e11d48}
+.btn:active{transform:translateY(1px)}
+.btn:disabled{opacity:.5;cursor:default;transform:none}
+.btn.ghost{background:transparent;color:var(--muted);border-color:var(--border)}
+.btn.ghost:hover{color:var(--fg);background:var(--surface-2)}
+
+/* ---------- phase timeline (canonical trace primitive) ---------- */
+.timeline{display:flex;align-items:stretch;border-bottom:1px solid var(--border);background:var(--surface);padding:0 18px}
+.phase{flex:1;display:flex;align-items:center;gap:10px;padding:11px 12px;cursor:pointer;
+  border-right:1px solid var(--border-soft);transition:background .15s;position:relative;min-width:0}
+.phase:last-child{border-right:0}
+.phase:hover{background:var(--surface-2)}
+.phase .node{width:11px;height:11px;border-radius:50%;flex:0 0 auto;border:2px solid var(--border);background:var(--surface-2);transition:.2s}
+.phase .meta{min-width:0}
+.phase .pl{font-size:9.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.phase .pn{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.phase[data-st="active"]{background:var(--surface-2)}
+.phase[data-st="done"] .pn,.phase[data-st="active"] .pn{color:var(--fg)}
+/* status coloring via data-color */
+.phase[data-color="rose"] .node{border-color:var(--rose)}
+.phase[data-color="amber"] .node{border-color:var(--amber)}
+.phase[data-color="violet"] .node{border-color:var(--violet)}
+.phase[data-color="cyan"] .node{border-color:var(--cyan)}
+.phase[data-color="mint"] .node{border-color:var(--mint)}
+.phase[data-st="done"][data-color] .node{background:currentColor}
+.phase[data-st="done"][data-color="rose"]{color:var(--rose)}
+.phase[data-st="done"][data-color="amber"]{color:var(--amber)}
+.phase[data-st="done"][data-color="violet"]{color:var(--violet)}
+.phase[data-st="done"][data-color="cyan"]{color:var(--cyan)}
+.phase[data-st="done"][data-color="mint"]{color:var(--mint)}
+.phase[data-st="active"][data-color] .node{background:currentColor;box-shadow:0 0 0 4px currentColor;animation:pulse 1.6s ease-in-out infinite}
+.phase[data-st="active"][data-color="rose"]{color:var(--rose)}
+.phase[data-st="active"][data-color="amber"]{color:var(--amber)}
+.phase[data-st="active"][data-color="violet"]{color:var(--violet)}
+.phase[data-st="active"][data-color="cyan"]{color:var(--cyan)}
+.phase[data-st="active"][data-color="mint"]{color:var(--mint)}
+.phase .lat{margin-left:auto;font-size:10px;color:var(--faint);font-variant-numeric:tabular-nums}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 4px rgba(255,255,255,0)}50%{box-shadow:0 0 0 5px color-mix(in srgb,currentColor 35%,transparent)}}
+
+/* ---------- 3-column grid ---------- */
+.grid{display:grid;grid-template-columns:280px 1fr 300px;gap:1px;background:var(--border);overflow:hidden}
+.col{background:var(--bg);overflow-y:auto;min-height:0}
+.panel{padding:16px}
+.phead{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.ptitle{font-size:10px;text-transform:uppercase;letter-spacing:.14em;color:var(--muted-2)}
+.pcount{font-size:10px;color:var(--faint)}
+
+/* registry */
+.search{width:100%;font-family:var(--font-mono);font-size:12px;background:var(--surface-2);
+  border:1px solid var(--border);color:var(--fg);padding:8px 10px;border-radius:6px;margin-bottom:10px}
+.search:focus{outline:none;border-color:var(--cyan)}
+.cap{border:1px solid var(--border);background:var(--surface);border-radius:8px;padding:11px;margin-bottom:8px;cursor:pointer;transition:.15s}
+.cap:hover{border-color:#3f3f46;background:var(--surface-2)}
+.cap.sel{border-color:var(--violet);background:var(--violet-12)}
+.cap .crow{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.cap .cid{font-size:11px;color:var(--fg);font-weight:500}
+.cap .price{font-size:13px;color:var(--mint);font-weight:600;letter-spacing:-.01em}
+.cap .cobj{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.45;font-family:var(--font-body)}
+.cap .cmeta{display:flex;gap:10px;margin-top:8px;font-size:9.5px;color:var(--muted-2);text-transform:uppercase;letter-spacing:.08em}
+.cat{display:inline-block;font-size:9px;border:1px solid var(--border);color:var(--muted);padding:1px 5px;border-radius:3px;letter-spacing:.1em}
+
+/* ---------- center run column ---------- */
+.now{border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:14px;background:linear-gradient(180deg,var(--surface) 0%,var(--bg) 120%)}
+.now .k{font-size:9.5px;text-transform:uppercase;letter-spacing:.14em;color:var(--muted-2);margin-bottom:6px;display:flex;align-items:center;gap:7px}
+.now .k .live{width:6px;height:6px;border-radius:50%;background:var(--faint)}
+.now.live .k .live{background:var(--cyan);box-shadow:0 0 8px var(--cyan);animation:pulse2 1.4s infinite}
+@keyframes pulse2{0%,100%{opacity:1}50%{opacity:.4}}
+.now .h{font-size:19px;font-weight:600;letter-spacing:-.015em;line-height:1.25;color:var(--fg);font-family:var(--font-body)}
+.now .sub{font-size:12px;color:var(--muted);margin-top:6px;font-family:var(--font-body);max-width:62ch}
+
+/* thinking panel */
+.think{border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:14px;background:var(--surface)}
+.think.hide{display:none}
+.think .th{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.think .th .ic{font-size:10px;color:var(--amber);text-transform:uppercase;letter-spacing:.12em;font-weight:600}
+.think .th .prov{margin-left:auto;font-size:10px;color:var(--muted-2)}
+.think .sum{font-size:13px;line-height:1.55;color:var(--fg);font-family:var(--font-body)}
+.think .rat{font-size:12px;color:var(--muted);margin-top:8px;font-family:var(--font-body);line-height:1.55}
+.conf{display:flex;align-items:center;gap:10px;margin-top:12px}
+.conf .lab{font-size:10px;color:var(--muted-2);text-transform:uppercase;letter-spacing:.1em;min-width:78px}
+.bar{flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--amber);width:0;transition:width .8s cubic-bezier(.2,.7,.2,1)}
+.conf .val{font-size:12px;color:var(--amber);font-weight:600;min-width:38px;text-align:right}
+
+/* ROI hero (decisive flourish) */
+.roi{border:1px solid var(--mint);border-radius:10px;padding:16px 18px;margin-bottom:14px;background:var(--mint-12);display:none}
+.roi.show{display:block;animation:rise .5s ease-out}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.roi .rk{font-size:9.5px;text-transform:uppercase;letter-spacing:.14em;color:var(--mint)}
+.roi .cmp{display:flex;align-items:baseline;gap:14px;margin-top:10px;flex-wrap:wrap}
+.roi .side{display:flex;flex-direction:column}
+.roi .side .l{font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted-2)}
+.roi .side .n{font-size:26px;font-weight:600;letter-spacing:-.025em;line-height:1.1}
+.roi .side.direct .n{color:var(--rose);text-decoration:line-through;text-decoration-thickness:1.5px}
+.roi .side.pack .n{color:var(--fg)}
+.roi .arr{font-size:18px;color:var(--muted-2)}
+.roi .saved{margin-left:auto;text-align:right}
+.roi .saved .n{font-size:30px;font-weight:600;color:var(--mint);letter-spacing:-.025em}
+.roi .saved .l{font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted-2)}
+
+/* trace spans */
+.section-label{font-size:9.5px;text-transform:uppercase;letter-spacing:.14em;color:var(--muted-2);margin:2px 0 10px}
+.spans{position:relative;padding-left:20px}
+.spans::before{content:"";position:absolute;left:5px;top:4px;bottom:4px;width:1px;background:var(--border)}
+.span{position:relative;margin-bottom:7px;border:1px solid var(--border);border-radius:8px;background:var(--surface);overflow:hidden;transition:.15s}
+.span::before{content:"";position:absolute;left:-19px;top:13px;width:9px;height:9px;border-radius:50%;background:var(--surface);border:2px solid var(--border);transition:.2s}
+.span[data-color="rose"]::before{border-color:var(--rose)} .span[data-color="amber"]::before{border-color:var(--amber)}
+.span[data-color="violet"]::before{border-color:var(--violet)} .span[data-color="cyan"]::before{border-color:var(--cyan)}
+.span[data-color="mint"]::before{border-color:var(--mint)}
+.span.active[data-color="rose"]::before{background:var(--rose)} .span.active[data-color="amber"]::before{background:var(--amber)}
+.span.active[data-color="violet"]::before{background:var(--violet)} .span.active[data-color="cyan"]::before{background:var(--cyan)}
+.span.active[data-color="mint"]::before{background:var(--mint)}
+.span.active{border-color:#3f3f46}
+.span.empty{border-style:dashed;color:var(--faint)}
+.sh{display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;user-select:none}
+.span.empty .sh{cursor:default}
+.srole{font-size:9px;text-transform:uppercase;letter-spacing:.1em;font-weight:600;min-width:54px}
+.span[data-color="rose"] .srole{color:var(--rose)} .span[data-color="amber"] .srole{color:var(--amber)}
+.span[data-color="violet"] .srole{color:var(--violet)} .span[data-color="cyan"] .srole{color:var(--cyan)}
+.span[data-color="mint"] .srole{color:var(--mint)}
+.stitle{font-size:12.5px;color:var(--fg);font-weight:500;font-family:var(--font-body);flex:1;min-width:0}
+.smetric{font-size:10.5px;color:var(--muted);background:var(--surface-2);border:1px solid var(--border);padding:2px 7px;border-radius:4px}
+.slat{font-size:10px;color:var(--faint)}
+.sdet{border-top:1px solid var(--border-soft);padding:0;display:none}
+.span.open .sdet{display:block}
+.kv{display:grid;grid-template-columns:46px 1fr;gap:4px 12px;padding:11px 12px;font-size:11px}
+.kv .k{color:var(--muted-2);text-transform:uppercase;letter-spacing:.08em;font-size:9.5px;padding-top:1px}
+.kv .v{color:var(--fg);word-break:break-all}
+.kv .v.muted{color:var(--muted);font-family:var(--font-body)}
+.json{background:var(--bg);border:1px solid var(--border-soft);border-radius:6px;padding:9px 11px;font-size:10.5px;color:var(--cyan);white-space:pre-wrap;word-break:break-all;margin:6px 12px 11px;line-height:1.5}
+.json .k2{color:var(--muted)} .json .s2{color:var(--mint)} .json .n2{color:var(--amber)}
+
+/* decision tree */
+.dtree{border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-top:14px;background:var(--surface)}
+.dtree.hide{display:none}
+.dp{display:grid;grid-template-columns:auto 1fr;gap:8px 12px;margin-top:8px;padding:9px 0;border-top:1px solid var(--border-soft)}
+.dp:first-of-type{border-top:0;padding-top:4px}
+.dp .step{font-size:10px;color:var(--faint);font-weight:600;padding-top:2px}
+.dp .cond{font-size:11.5px;color:var(--cyan);font-family:var(--font-mono)}
+.dp .act{font-size:12px;color:var(--fg);margin-top:3px;font-family:var(--font-body)}
+.dp .act::before{content:"→ ";color:var(--muted-2)}
+.dp .fs{font-size:10px;color:var(--amber);margin-top:3px}
+.dp .fs::before{content:"failsafe · ";color:var(--muted-2)}
+.dp .pol{font-size:10px;color:var(--rose);margin-top:3px}
+.dp .pol::before{content:"policy · ";color:var(--muted-2)}
+
+/* ---------- right rail: vitals + ledger ---------- */
+.vitals{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:14px}
+.vit{background:var(--surface);padding:11px 12px}
+.vit .k{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted-2)}
+.vit .v{font-size:18px;font-weight:600;letter-spacing:-.02em;color:var(--fg);margin-top:3px}
+.vit .v .u{font-size:10px;color:var(--muted);font-weight:400;margin-left:2px}
+.vit.good .v{color:var(--mint)} .vit.bad .v{color:var(--rose)} .vit.warn .v{color:var(--amber)}
+
+.ledger .row{display:grid;grid-template-columns:1fr auto;gap:4px;padding:8px 0;border-top:1px solid var(--border-soft);font-size:11px}
+.ledger .row:first-of-type{border-top:0}
+.ledger .row .a{color:var(--muted);word-break:break-all}
+.ledger .row .a b{color:var(--fg);font-weight:500}
+.ledger .row .amt{color:var(--mint);font-weight:600;text-align:right}
+.ledger .st{font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--mint);margin-top:1px}
+.ledger-empty{font-size:11px;color:var(--faint);padding:18px 0;text-align:center;font-family:var(--font-body)}
+
+/* evidence stream */
+.evstream{border:1px solid var(--border);border-radius:8px;background:var(--bg);padding:10px 12px;max-height:200px;overflow-y:auto;font-size:10.5px;line-height:1.6}
+.ev{display:flex;gap:9px;padding:2px 0}
+.ev .src{color:var(--muted-2);min-width:46px;text-transform:uppercase;letter-spacing:.06em;font-size:9px;padding-top:1px}
+.ev[data-c="rose"] .src{color:var(--rose)} .ev[data-c="amber"] .src{color:var(--amber)}
+.ev[data-c="violet"] .src{color:var(--violet)} .ev[data-c="cyan"] .src{color:var(--cyan)} .ev[data-c="mint"] .src{color:var(--mint)}
+.ev .tx{color:var(--muted);word-break:break-word}
+.ev .tx b{color:var(--fg);font-weight:500}
+
+.scrub{display:flex;align-items:center;gap:8px;margin-top:12px}
+.scrub .pos{font-size:10px;color:var(--muted-2);font-variant-numeric:tabular-nums;min-width:74px}
+kbd{font-family:var(--font-mono);font-size:9.5px;border:1px solid var(--border);background:var(--surface-2);color:var(--muted);padding:1px 5px;border-radius:3px}
+
+/* payment overlay */
+.overlay{position:fixed;inset:0;background:rgba(9,9,11,.82);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:50}
+.overlay.show{display:flex;animation:fade .25s}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.paycard{border:1px solid var(--cyan);background:var(--surface);border-radius:12px;padding:26px 30px;width:380px;max-width:90vw;box-shadow:0 0 60px rgba(6,182,212,.18)}
+.paycard .pk{font-size:10px;text-transform:uppercase;letter-spacing:.14em;color:var(--cyan)}
+.paycard .ph{font-size:17px;font-weight:600;margin:8px 0 4px;letter-spacing:-.01em;font-family:var(--font-body)}
+.paycard .ps{font-size:11.5px;color:var(--muted);font-family:var(--font-body);line-height:1.5}
+.spinner{width:30px;height:30px;border:2px solid var(--border);border-top-color:var(--cyan);border-radius:50%;animation:spin .8s linear infinite;margin:16px auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+@media(max-width:1100px){.grid{grid-template-columns:1fr}.col:first-child,.col:last-child{display:none}}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ===== TOP BAR ===== -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="mark">ACE</span>
+      <span class="tag">Agent Capability Exchange</span>
+    </div>
+    <div class="runtime">
+      <span class="chip"><span class="dot"></span> <b id="rt-mode">demo</b></span>
+      <span class="chip">provider <b>deepseek-v4-flash</b></span>
+      <span class="chip">chain <b>Arc testnet</b></span>
+      <span class="chip">settle <b>x402 · EIP-712</b></span>
+    </div>
+    <div class="spacer"></div>
+    <div class="savings-hero">
+      <div>
+        <div class="k">cumulative saved</div>
+        <div class="v"><span id="sav-total">0.0000</span><span class="u">USDC</span></div>
+      </div>
+    </div>
+    <button class="btn" id="trigger">Trigger Circle spend-limit error</button>
+  </header>
+
+  <!-- ===== PHASE TIMELINE ===== -->
+  <nav class="timeline" id="timeline"></nav>
+
+  <!-- ===== MAIN GRID ===== -->
+  <div class="grid">
+
+    <!-- LEFT: registry -->
+    <aside class="col" id="registry">
+      <div class="panel">
+        <div class="phead"><span class="ptitle">Capability Registry</span><span class="pcount" id="reg-count">5 verified</span></div>
+        <input class="search" id="reg-search" placeholder="filter packs…" />
+        <div id="reg-list"></div>
+      </div>
+    </aside>
+
+    <!-- CENTER: live run -->
+    <main class="col" id="run">
+      <div class="panel">
+
+        <!-- now / headline -->
+        <div class="now" id="now">
+          <div class="k"><span class="live"></span> <span id="now-k">Agent idle</span></div>
+          <div class="h" id="now-h">Trigger an incident to watch the consumer agent resolve it.</div>
+          <div class="sub" id="now-sub">It will price direct recovery, match a verified capability pack, pay $0.002 via x402, and execute the decision tree — observable, step by step.</div>
+        </div>
+
+        <!-- thinking -->
+        <div class="think hide" id="think">
+          <div class="th"><span class="ic">Agent reasoning</span><span class="prov" id="think-prov">deepseek-v4-flash · advisory</span></div>
+          <div class="sum" id="think-sum"></div>
+          <div class="rat" id="think-rat"></div>
+          <div class="conf"><span class="lab">confidence</span><div class="bar"><i id="conf-bar"></i></div><span class="val" id="conf-val">—</span></div>
+        </div>
+
+        <!-- ROI hero -->
+        <div class="roi" id="roi">
+          <div class="rk">ROI gate · purchase justified</div>
+          <div class="cmp">
+            <div class="side direct"><span class="l">direct trial-and-error</span><span class="n" id="roi-direct">$0.2500</span></div>
+            <span class="arr">vs</span>
+            <div class="side pack"><span class="l">verified capability</span><span class="n" id="roi-pack">$0.0020</span></div>
+            <div class="saved"><span class="l">cost saved</span><span class="n" id="roi-saved">92%</span></div>
+          </div>
+        </div>
+
+        <!-- trace spans -->
+        <div class="section-label">Execution trace</div>
+        <div class="spans" id="spans"></div>
+
+        <!-- decision tree -->
+        <div class="dtree hide" id="dtree">
+          <div class="phead"><span class="ptitle">Purchased decision tree</span><span class="pcount" id="dt-id">cap_circle_lockout_recovery</span></div>
+          <div id="dp-list"></div>
+        </div>
+
+        <!-- scrubber -->
+        <div class="scrub">
+          <button class="btn ghost" id="prev">‹ step</button>
+          <button class="btn ghost" id="next">step ›</button>
+          <span class="pos" id="scrub-pos">step 0 / 0</span>
+          <span style="margin-left:auto"><kbd>←</kbd> <kbd>→</kbd> scrub</span>
+        </div>
+
+      </div>
+    </main>
+
+    <!-- RIGHT: vitals + ledger -->
+    <aside class="col" id="rail">
+      <div class="panel">
+        <div class="section-label" style="margin-top:0">Run vitals</div>
+        <div class="vitals">
+          <div class="vit warn"><div class="k">tokens at risk (direct)</div><div class="v" id="v-tokens">0</div></div>
+          <div class="vit"><div class="k">tokens spent (ACE)</div><div class="v" id="v-tokspent">0</div></div>
+          <div class="vit bad"><div class="k">cost this run</div><div class="v"><span id="v-cost">0.0000</span><span class="u">USDC</span></div></div>
+          <div class="vit good"><div class="k">saved this run</div><div class="v"><span id="v-saved">0.0000</span><span class="u">USDC</span></div></div>
+          <div class="vit"><div class="k">end-to-end latency</div><div class="v"><span id="v-lat">0</span><span class="u">ms</span></div></div>
+          <div class="vit"><div class="k">settlements</div><div class="v" id="v-settle">0</div></div>
+        </div>
+
+        <div class="section-label">Settlement ledger</div>
+        <div class="ledger" id="ledger"><div class="ledger-empty">no nanopayments yet</div></div>
+
+        <div class="section-label" style="margin-top:16px">Evidence stream</div>
+        <div class="evstream" id="ev"></div>
+      </div>
+    </aside>
+
+  </div>
+</div>
+
+<!-- payment overlay -->
+<div class="overlay" id="overlay">
+  <div class="paycard">
+    <div class="pk">x402 authorization</div>
+    <div class="ph">Signing TransferWithAuthorization…</div>
+    <div class="ps">Off-chain EIP-712 signature — no gas, no on-chain tx. Settling <b style="color:var(--cyan)">0.0020 USDC</b> to the capability seller.</div>
+    <div class="spinner"></div>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   DATA — every value lifted from ace's real source (seed_capabilities.yaml,
+   traceEngine.ts classifyState, IncidentSandbox.ts playback, types.ts).
+   ===================================================================== */
+const PHASES=[
+  {key:"incident",label:"01 · Incident",short:"Fault detected",color:"rose"},
+  {key:"reasoning",label:"02 · Cost Model",short:"ROI triage",color:"amber"},
+  {key:"registry",label:"03 · Market Match",short:"Registry scan",color:"violet"},
+  {key:"payment",label:"04 · x402",short:"Payment",color:"cyan"},
+  {key:"execution",label:"05 · Execution",short:"Decision tree",color:"mint"},
+];
+
+const CAPS=[
+  {id:"cap_circle_lockout_recovery",cat:"RECOVERY",price:0.0020,
+   obj:"Recover and reset Circle wallet spending limits under OTP-dropped concurrency lockouts",
+   runs:15,lat:88,tok:96,sel:true,
+   points:[
+     {c:"wallet_status == SESSION_LOCKED",a:"fetch_monotonic_nonce",fs:"reset_local_nonce_to_onchain"},
+     {c:"last_execution_error == invalid_nonce",a:"force_sync_block_header"},
+     {c:"transaction_dropped == true",a:"sequence_traverse_fallback_rpc"},
+     {c:"spend_limit_exceeded == true",a:"generate_limit_reset_policy",params:{per_tx:1,daily:5},pol:"delegate_otp_to_admin_without_storing_in_agent_memory"},
+   ],
+   auditor:"0x…ACE1"},
+  {id:"cap_arc_nonce_rebalance",cat:"RPC",price:0.0014,
+   obj:"Rebalance Arc testnet nonce drift after multi-RPC transaction fanout",
+   runs:24,lat:81,tok:91,
+   points:[
+     {c:"rpc_divergence == true",a:"sample_nonce_across_rpc_quorum",fs:"pin_to_highest_confirmed_nonce"},
+     {c:"pending_tx_count == elevated",a:"cancel_stale_authorizations"},
+     {c:"replacement_underpriced == true",a:"reprice_with_gateway_floor",params:{multiplier:1.18}},
+   ],auditor:"0x…ACE4"},
+  {id:"cap_x402_facilitator_retry",cat:"PAYMENT",price:0.0018,
+   obj:"Recover x402 facilitator settlement after stale EIP-712 authorization windows",
+   runs:19,lat:76,tok:89,
+   points:[
+     {c:"settlement_status == rejected",a:"decode_facilitator_rejection"},
+     {c:"authorization_window == stale",a:"regenerate_transfer_with_authorization",params:{valid_before_seconds:605100}},
+     {c:"asset_mismatch == true",a:"rebuild_payment_required_accept_header",fs:"downgrade_to_local_settlement_record"},
+   ],auditor:"0x…ACE5"},
+  {id:"cap_kyc_webhook_replay",cat:"COMPLIANCE",price:0.0032,
+   obj:"Replay missed KYC webhook transitions without duplicating user verification state",
+   runs:31,lat:69,tok:84,
+   points:[
+     {c:"webhook_sequence_gap == true",a:"load_provider_event_cursor",fs:"isolate_dead_letter_batch"},
+     {c:"idempotency_key_seen == false",a:"replay_missing_verification_event"},
+     {c:"state_transition_valid == false",a:"hold_for_manual_compliance_review",pol:"never_auto_approve_identity_documents"},
+   ],auditor:"0x…ACE6"},
+  {id:"cap_vault_policy_rollback",cat:"GOVERNANCE",price:0.0045,
+   obj:"Rollback malformed treasury vault policy updates after partial multisig approval",
+   runs:12,lat:73,tok:87,
+   points:[
+     {c:"policy_hash_changed == true",a:"diff_policy_against_last_attested_hash"},
+     {c:"approval_threshold_met == partial",a:"freeze_new_spend_authorizations",pol:"require_two_admin_signatures_for_unfreeze"},
+     {c:"rollback_candidate_valid == true",a:"submit_policy_rollback_bundle",fs:"open_time_locked_recovery_proposal"},
+   ],auditor:"0x…ACE7"},
+];
+
+/* the agent run, modelled as ordered trace spans — the canonical observability
+   primitive. copy is verbatim from traceEngine.classifyState. */
+const RUN=[
+ {phase:"incident",role:"FAULT",color:"rose",title:"Fault signal captured",
+  summary:"The consumer agent detected a Circle spend-limit lockout and froze direct execution.",
+  metric:"Risk: asset op blocked",lat:120,
+  ev:{src:"FAULT",c:"rose",tx:"CRITICAL: Spender wallet hit spend limit threshold. <b>API transaction aborted.</b>"},
+  detail:{Signal:"402_LIMIT_EXCEEDED",Service:"circle-wallet",Action:"freeze direct execution"},
+  in:{error_code:"402_LIMIT_EXCEEDED",log:"Error: CLI execution limit exceeded on stablecoin transfer"}},
+ {phase:"reasoning",role:"COST",color:"amber",title:"Direct recovery priced",
+  summary:"The agent estimated the cost of solving the incident through recursive trial-and-error.",
+  metric:"Direct path: $0.2500 USDC",lat:480,
+  ev:{src:"COST",c:"amber",tx:"Estimated Direct Cost: <b>$0.2500 USDC</b> (≈120,000 prompt tokens at risk)."},
+  detail:{"cost model":"(T_in·P_in)+(T_out·P_out)+risk_premium","direct cost":"$0.2500 USDC","tokens at risk":"≈120,000","risk":"HIGH — lockout escalates on retry"},
+  think:{sum:"A direct retry loop on this Circle spend-limit lockout is high-risk: nonce races and repeated 402s would burn ~120k prompt tokens with no guarantee of recovery. A verified capability pack exists for this exact signature at $0.002.",
+          rat:"Pack price ($0.002) ≪ expected direct cost ($0.25), and the pack carries a valid auditor attestation + a deterministic decision tree. Recommend acquiring cap_circle_lockout_recovery.",
+          conf:0.92}},
+ {phase:"registry",role:"SCAN",color:"violet",title:"Registry query issued",
+  summary:"The agent is searching audited capability packs by trigger signature and incident context.",
+  metric:"Search space: verified packs",lat:90,
+  ev:{src:"SCAN",c:"violet",tx:"Searching ACE Registry by trigger signature 402_LIMIT_EXCEEDED…"},
+  detail:{"query":"find_matches(error_code, log_snippet)","candidates returned":3,"ranked by":"fit · price · provenance"}},
+ {phase:"registry",role:"MATCH",color:"violet",title:"Capability selected",
+  summary:"The agent selected cap_circle_lockout_recovery as the cheapest verified recovery route.",
+  metric:"Pack price: $0.0020 USDC",lat:60,
+  ev:{src:"MATCH",c:"violet",tx:"Selected <b>'cap_circle_lockout_recovery'</b> at $0.0020 USDC — 96% token saving, 15 runs analyzed."},
+  detail:{selected:"cap_circle_lockout_recovery",price:"$0.0020 USDC",provenance:"chaos_test_runs · replayed_failure_scenarios","token saving":"96%","latency reduction":"88%",attestation:"0x…ACE1 ✓"},
+ {phase:"reasoning",role:"GATE",color:"amber",title:"Purchase gate passed",
+  summary:"The capability pack is cheaper than expected direct recovery and has a verified route.",
+  metric:"Expected saving: 92%",lat:70,
+  ev:{src:"COST",c:"amber",tx:"<b>ROI Decision:</b> $0.0020 &lt; ~$0.2500 USDC. Expected Cost Saved: 92%."},
+  detail:{decision:"pack_price < direct_cost AND attestation_valid","$0.0020":"< $0.2500",accepted:true}},
+ {phase:"payment",role:"X402",color:"cyan",title:"Paywall challenge received",
+  summary:"The capability endpoint returned a structured x402 payment requirement.",
+  metric:"Protocol: HTTP 402",lat:110,overlay:true,
+  ev:{src:"X402",c:"cyan",tx:"Server returned <b>HTTP 402</b> (Payment Required). Decoding PAYMENT-REQUIRED challenge…"},
+  detail:{"GET":"/capabilities/cap_circle_lockout_recovery/download","status":402,"accepts":"USDC · Arc testnet","payTo":"0x…ACE1","amount":"0.0020"},
+  out:{challenge:"x402 v2",accepts:[{network:"eip155:arc",scheme:"transfer",asset:"USDC",amount:"2000",payTo:"0x…ACE1"}]}},
+ {phase:"payment",role:"SIGN",color:"cyan",title:"Off-chain authorization signing",
+  summary:"The agent is signing EIP-712 typed data without sending a gas transaction.",
+  metric:"TransferWithAuthorization",lat:140,
+  ev:{src:"X402",c:"cyan",tx:"Signing <b>EIP-712</b> typed data with Consumer Agent key (off-chain, gas-free)…"},
+  out:{primaryType:"TransferWithAuthorization",domain:{name:"GatewayWalletBatched",version:"1",chainId:"arc"},message:{from:"0x…ACE0",to:"0x…ACE1",value:"2000",nonce:"0x4f2a…c1"}}},
+ {phase:"payment",role:"SETTLE",color:"cyan",title:"Capability unlocked",
+  summary:"The payment authorization was accepted and settlement evidence was recorded.",
+  metric:"Ledger: completed",lat:130,overlayOff:true,
+  ev:{src:"X402",c:"cyan",tx:"<b>Authorization accepted.</b> Signature 0x48f57f… Downloading capability…"},
+  out:{settlement_id:"stl_8af2c1",status:"completed","tx_hash":"0x9a0870…4c4c",ledger:"entry recorded"},
+  ledger:{id:1,cap:"cap_circle_lockout_recovery",amount:0.0020}},
+ {phase:"execution",role:"EXEC",color:"mint",title:"Decision tree executing",
+  summary:"Walking the purchased capability's decision points against live wallet state.",
+  metric:"4 decision points",lat:260,
+  ev:{src:"DONE",c:"mint",tx:"Executing decision tree — resolving lockout without trial-and-error…"},
+  detail:{"step 1":"wallet_status == SESSION_LOCKED → fetch_monotonic_nonce ✓","step 2":"invalid_nonce → force_sync_block_header ✓","step 3":"transaction_dropped → sequence_traverse_fallback_rpc ✓","step 4":"spend_limit_exceeded → generate_limit_reset_policy ✓"}},
+ {phase:"execution",role:"DONE",color:"mint",title:"Recovery path completed",
+  summary:"The purchased decision tree resolved the wallet lockout without further trial-and-error.",
+  metric:"Outcome: operational recovery",lat:80,
+  ev:{src:"DONE",c:"mint",tx:"<b>Recovery path completed.</b> Wallet operational. Ledger + savings persisted."},
+  detail:{outcome:"operational recovery","tokens spent":"≈1,400 (vs 120,000 direct)","cost":"$0.0020 USDC","status":"resolved ✓"}},
+];
+
+/* =====================================================================
+   STATE
+   ===================================================================== */
+const STORE="ace:obs:step";
+let step=0;                 // how many spans are revealed (0..RUN.length)
+let running=false;
+let timer=null;
+let ledger=[];
+let cumulativeSaved=0;
+let selectedCap=CAPS[0];
+
+const $=s=>document.querySelector(s);
+const el=s=>document.getElementById(s);
+
+/* =====================================================================
+   RENDER
+   ===================================================================== */
+function renderTimeline(){
+  el("timeline").innerHTML=PHASES.map(p=>{
+    // status from furthest revealed span in this phase
+    const idx=RUN.filter(s=>s.phase===p.key).map((_,i)=>i);
+    const seen=RUN.slice(0,step).filter(s=>s.phase===p.key).length;
+    const total=RUN.filter(s=>s.phase===p.key).length;
+    const isDone=seen>0 && seen>=total;
+    const isActive=seen>0 && !isDone;
+    const st=isDone?"done":isActive?"active":"pending";
+    return `<div class="phase" data-phase="${p.key}" data-color="${p.color}" data-st="${st}" onclick="jumpPhase('${p.key}')">
+      <span class="node"></span>
+      <span class="meta"><span class="pl">${p.label}</span><span class="pn">${p.short}</span></span>
+      <span class="lat">${seen}/${total||'·'}</span>
+    </div>`;
+  }).join("");
+}
+
+function renderSpans(){
+  const host=el("spans");
+  host.innerHTML="";
+  for(let i=0;i<RUN.length;i++){
+    const s=RUN[i];
+    const revealed=i<step;
+    const div=document.createElement("div");
+    div.className="span"+(revealed?(i===step-1?" active open":""):" empty");
+    div.setAttribute("data-color",s.color);
+    div.setAttribute("data-i",i);
+    if(!revealed){
+      div.innerHTML=`<div class="sh"><span class="srole">${s.role}</span><span class="stitle" style="color:var(--faint)">pending…</span></div>`;
+    }else{
+      let det=`<div class="sh" onclick="toggleSpan(${i})">
+        <span class="srole">${s.role}</span>
+        <span class="stitle">${s.title}</span>
+        <span class="smetric">${s.metric}</span>
+        <span class="slat">${s.lat}ms</span>
+      </div><div class="sdet">`;
+      if(s.detail){
+        det+=`<div class="kv">`+Object.entries(s.detail).map(([k,v])=>`<span class="k">${k}</span><span class="v">${typeof v==='object'?'<span class="muted">'+v+'</span>':v}</span>`).join("")+`</div>`;
+      }
+      if(s.in) det+=`<div class="json">// input${json(s.in)}</div>`;
+      if(s.out) det+=`<div class="json">// output${json(s.out)}</div>`;
+      det+=`</div>`;
+      div.innerHTML=det;
+    }
+    host.appendChild(div);
+  }
+}
+
+function json(o){return " "+JSON.stringify(o,null,1).replace(/"([^"]+)":/g,'<span class="k2">"$1"</span>:').replace(/: "([^"]*)"/g,': <span class="s2">"$1"</span>').replace(/: ([0-9.]+)/g,': <span class="n2">$1</span>');}
+
+function renderEvidence(){
+  const lines=RUN.slice(0,step).map(s=>s.ev).filter(Boolean);
+  el("ev").innerHTML=lines.length?lines.map(e=>`<div class="ev" data-c="${e.c}"><span class="src">${e.src}</span><span class="tx">${e.tx}</span></div>`).join(""):`<div class="ev"><span class="tx" style="color:var(--faint)">awaiting first signal…</span></div>`;
+  el("ev").scrollTop=el("ev").scrollHeight;
+}
+
+function renderNow(){
+  const n=el("now");
+  if(step===0){n.classList.remove("live");el("now-k").textContent="Agent idle";
+    el("now-h").textContent="Trigger an incident to watch the consumer agent resolve it.";
+    el("now-sub").textContent="It will price direct recovery, match a verified capability pack, pay $0.002 via x402, and execute the decision tree — observable, step by step.";
+    return;
+  }
+  const s=RUN[step-1];const p=PHASES.find(p=>p.key===s.phase);
+  n.classList.add("live");
+  el("now-k").textContent=p.label+" · "+p.short;
+  el("now-h").textContent=s.title;
+  el("now-sub").textContent=s.summary;
+}
+
+function renderThink(){
+  const t=el("think");
+  const s=RUN[step-1];
+  if(s&&s.think){t.classList.remove("hide");
+    el("think-sum").textContent=s.think.sum;
+    el("think-rat").textContent=s.think.rat;
+    el("conf-bar").style.width=(s.think.conf*100)+"%";
+    el("conf-val").textContent=Math.round(s.think.conf*100)+"%";
+  }else if(s&&s.phase==="reasoning"){t.classList.remove("hide");
+    // keep prior reasoning visible while reasoning advances
+  }else{t.classList.add("hide");}
+}
+
+function renderROI(){
+  const s=RUN[step-1];
+  el("roi").classList.toggle("show",!!(s&&s.role==="GATE"));
+}
+
+function renderDTree(){
+  const execStarted=RUN.slice(0,step).some(s=>s.phase==="execution");
+  const dt=el("dtree");
+  if(!execStarted){dt.classList.add("hide");return;}
+  dt.classList.remove("hide");
+  el("dt-id").textContent=selectedCap.id;
+  el("dp-list").innerHTML=selectedCap.points.map((p,i)=>`
+    <div class="dp"><span class="step">${String(i+1).padStart(2,"0")}</span><div>
+      <div class="cond">${p.c}</div><div class="act">${p.a}</div>
+      ${p.params?`<div class="fs">params ${JSON.stringify(p.params)}</div>`:""}
+      ${p.fs?`<div class="fs">${p.fs}</div>`:""}
+      ${p.pol?`<div class="pol">${p.pol}</div>`:""}
+    </div></div>`).join("");
+}
+
+function renderVitals(){
+  const acc=RUN.slice(0,step).reduce((a,s)=>a+s.lat,0);
+  const reasoning=RUN.slice(0,step).some(s=>s.phase==="reasoning");
+  el("v-tokens").textContent=reasoning?"≈120,000":"0";
+  el("v-tokspent").textContent=step>=RUN.length?"≈1,400":(step>0?"…":"0");
+  el("v-lat").textContent=acc;
+  const cost=ledger.reduce((a,l)=>a+l.amount,0);
+  el("v-cost").textContent=cost.toFixed(4);
+  el("v-saved").textContent=cumulativeSaved.toFixed(4);
+  el("v-settle").textContent=ledger.length;
+  el("sav-total").textContent=cumulativeSaved.toFixed(4);
+}
+
+function renderLedger(){
+  const h=el("ledger");
+  if(!ledger.length){h.innerHTML=`<div class="ledger-empty">no nanopayments yet</div>`;return;}
+  h.innerHTML=ledger.slice().reverse().map(l=>`
+    <div class="row">
+      <div class="a"><b>${l.cap}</b><div class="st">settled · tx ${l.hash||"0x9a0870…"}</div></div>
+      <div class="amt">−${l.amount.toFixed(4)}<br><span style="color:var(--muted-2);font-size:9px">USDC</span></div>
+    </div>`).join("");
+}
+
+function renderRegistry(filter){
+  const f=(filter||"").toLowerCase();
+  el("reg-list").innerHTML=CAPS.filter(c=>!f||c.id.toLowerCase().includes(f)||c.cat.toLowerCase().includes(f)||c.obj.toLowerCase().includes(f))
+    .map(c=>`<div class="cap${c.id===selectedCap.id?" sel":""}" onclick="selectCap('${c.id}')">
+      <div class="crow"><span class="cid">${c.id}</span><span class="price">$${c.price.toFixed(4)}</span></div>
+      <div class="cobj">${c.obj}</div>
+      <div class="cmeta"><span class="cat">${c.cat}</span><span>${c.runs} runs</span><span>−${c.tok}% tok</span></div>
+    </div>`).join("");
+  el("reg-count").textContent=CAPS.filter(c=>!f||c.id.toLowerCase().includes(f)).length+" verified";
+}
+
+function renderScrub(){
+  el("scrub-pos").textContent=`step ${step} / ${RUN.length}`;
+}
+
+function renderAll(){
+  renderTimeline();renderSpans();renderEvidence();renderNow();renderThink();
+  renderROI();renderDTree();renderVitals();renderLedger();renderScrub();
+}
+
+/* =====================================================================
+   INTERACTIONS
+   ===================================================================== */
+function paint(){
+  renderAll();
+  try{localStorage.setItem(STORE,String(step))}catch(e){}
+}
+function toggleSpan(i){const d=el("spans").children[i];if(d.classList.contains("empty"))return;d.classList.toggle("open");}
+function jumpPhase(key){
+  if(running)stopRun();
+  const idx=RUN.findIndex(s=>s.phase===key);
+  if(idx<0)return;
+  step=idx+1;paint();
+}
+function selectCap(id){selectedCap=CAPS.find(c=>c.id===id)||CAPS[0];renderRegistry(el("reg-search").value);renderDTree();}
+
+function applyStepEffects(prev){
+  if(step<=prev)return;
+  // process every newly revealed span in order
+  for(let i=prev;i<step;i++){
+    const s=RUN[i];
+    if(s.overlay)showOverlay();
+    if(s.overlayOff)hideOverlay();
+    if(s.ledger){
+      ledger.push({cap:s.ledger.cap,amount:s.ledger.amount,hash:"0x9a0870…4c4c"});
+      cumulativeSaved+=0.2480; // $0.2500 − $0.0020
+    }
+  }
+}
+
+function advance(){
+  if(step>=RUN.length){stopRun();return;}
+  const prev=step;step++;applyStepEffects(prev);paint();
+}
+function startRun(){
+  if(running)return;
+  if(step>=RUN.length){step=0;ledger=[];cumulativeSaved=0;}
+  running=true;el("trigger").disabled=true;el("trigger").textContent="Running…";
+  // reveal first immediately, then pace the rest by each span's latency (scaled)
+  advance();
+  const tick=()=>{
+    if(!running)return;
+    if(step>=RUN.length){stopRun();return;}
+    const lat=Math.min(900,Math.max(380,RUN[step-1]?RUN[step-1].lat*3.2:600));
+    timer=setTimeout(()=>{advance();tick();},lat);
+  };
+  timer=setTimeout(tick,500);
+}
+function stopRun(){running=false;if(timer)clearTimeout(timer);el("trigger").disabled=false;el("trigger").textContent="Trigger Circle spend-limit error";hideOverlay();}
+
+function showOverlay(){el("overlay").classList.add("show");}
+function hideOverlay(){el("overlay").classList.remove("show");}
+
+function scrub(d){
+  if(running)stopRun();
+  const prev=step;step=Math.max(0,Math.min(RUN.length,step+d));
+  // recompute ledger/saved from scratch when scrubbing backward
+  if(step<prev){ledger=[];cumulativeSaved=0;for(let i=0;i<step;i++){if(RUN[i].ledger){ledger.push({cap:RUN[i].ledger.cap,amount:RUN[i].ledger.amount});cumulativeSaved+=0.2480;}}}
+  else{applyStepEffects(prev);}
+  hideOverlay();
+  const cur=RUN[step-1];
+  if(cur&&cur.overlay)showOverlay();
+  paint();
+}
+
+/* =====================================================================
+   BOOT
+   ===================================================================== */
+el("trigger").onclick=startRun;
+el("prev").onclick=()=>scrub(-1);
+el("next").onclick=()=>scrub(1);
+el("reg-search").oninput=e=>renderRegistry(e.target.value);
+el("overlay").onclick=hideOverlay;
+
+window.addEventListener("keydown",e=>{
+  if(e.target.tagName==="INPUT")return;
+  if(e.key==="ArrowRight"){e.preventDefault();running?null:scrub(1);}
+  else if(e.key==="ArrowLeft"){e.preventDefault();running?null:scrub(-1);}
+  else if(e.key===" "&&!running){e.preventDefault();startRun();}
+  else if(e.key==="Escape")stopRun();
+},true);
+
+// restore
+try{const s=parseInt(localStorage.getItem(STORE)||"0",10);if(!isNaN(s)){step=Math.min(s,RUN.length);for(let i=0;i<step;i++){if(RUN[i].ledger){ledger.push({cap:RUN[i].ledger.cap,amount:RUN[i].ledger.amount});cumulativeSaved+=0.2480;}}}}catch(e){}
+
+renderRegistry("");
+renderAll();
+</script>
+</body>
+</html>
