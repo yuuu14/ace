@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from app.config import settings
 from app.core.cost import estimated_direct_cost_usdc, savings_pct
 from app.core.executor import execute_capability
+from app.core.llm import analyze_incident_with_llm
 from app.core.payment import (
     build_demo_signature_payload,
     create_ledger_entry,
@@ -44,12 +45,24 @@ def resolve_incident(request: ResolveRequest, buyer_address: str = "0x0000000000
     """Run the consumer agent economic decision loop."""
     direct_cost = estimated_direct_cost_usdc()
     matches = registry.find_matches(request.incident.error_code, request.incident.log_snippet or "")
+    live_analysis = analyze_incident_with_llm(request.incident, matches, direct_cost)
+
+    if live_analysis:
+        adjusted_cost = live_analysis.get("direct_cost_adjustment_usdc")
+        if isinstance(adjusted_cost, int | float) and adjusted_cost > 0:
+            direct_cost = float(adjusted_cost)
+
+        recommended_id = live_analysis.get("recommended_capability_id")
+        if recommended_id:
+            matches = sorted(matches, key=lambda cap: 0 if cap.id == recommended_id else 1)
 
     if not matches:
         return ResolveResponse(
             accepted=False,
             message=f"No verified capability found for incident [{request.incident.error_code or 'unknown'}].",
             estimated_direct_cost_usdc=direct_cost,
+            mode=settings.ACE_MODE,
+            live_analysis=live_analysis,
         )
 
     candidate = matches[0]
@@ -60,6 +73,8 @@ def resolve_incident(request: ResolveRequest, buyer_address: str = "0x0000000000
             capability_id=candidate.id,
             price_usdc=candidate.price_usdc,
             estimated_direct_cost_usdc=direct_cost,
+            mode=settings.ACE_MODE,
+            live_analysis=live_analysis,
             message="Capability price exceeds consumer maximum.",
         )
 
@@ -69,6 +84,8 @@ def resolve_incident(request: ResolveRequest, buyer_address: str = "0x0000000000
             capability_id=candidate.id,
             price_usdc=candidate.price_usdc,
             estimated_direct_cost_usdc=direct_cost,
+            mode=settings.ACE_MODE,
+            live_analysis=live_analysis,
             message="Direct recovery is cheaper than the marketplace pack.",
         )
 
@@ -79,6 +96,8 @@ def resolve_incident(request: ResolveRequest, buyer_address: str = "0x0000000000
         estimated_direct_cost_usdc=direct_cost,
         savings_pct=savings_pct(candidate.price_usdc, direct_cost),
         decision_points=[dp.model_dump() for dp in candidate.decision_points],
+        mode=settings.ACE_MODE,
+        live_analysis=live_analysis,
         message=f"ROI Decision: ${candidate.price_usdc:.4f} < ~${direct_cost:.4f} USDC. SECURE PATH CONFIRMED. Action: PURCHASE.",
     )
 

@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import agent, capabilities, ledger
+from app.config import settings
 from app.seed import seed_all
 
 
@@ -38,3 +39,16 @@ app.include_router(ledger.router)
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok", "service": "ace-backend"}
+
+
+@app.get("/runtime")
+def runtime() -> dict:
+    return {
+        "mode": settings.ACE_MODE,
+        "live": settings.is_live_mode,
+        "llm_provider": "deepseek" if "deepseek" in settings.LLM_BASE_URL else "openai-compatible",
+        "llm_model": settings.LLM_MODEL,
+        "llm_configured": bool(settings.LLM_API_KEY),
+        "chain_id": settings.ARC_CHAIN_ID,
+        "x402_settlement_mode": settings.X402_SETTLEMENT_MODE,
+    }

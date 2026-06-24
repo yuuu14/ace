@@ -17,7 +17,7 @@ SEED_FILE = DATA_DIR / "seed_capabilities.yaml"
 
 def load_capabilities(path: Path = SEED_FILE) -> list[Capability]:
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
-    caps = raw.get("capability", raw) if isinstance(raw, dict) else raw
+    caps = raw.get("capabilities", raw.get("capability", raw)) if isinstance(raw, dict) else raw
     if isinstance(caps, dict):
         caps = [caps]
     return [Capability.model_validate(c) for c in caps]

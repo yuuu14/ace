@@ -1,14 +1,7 @@
-import type { TraceLine } from "./types";
+import type { ResolveResponse, TraceLine } from "./types";
 
 export function buildResolveTrace(
-  response: {
-    estimated_direct_cost_usdc: number | null;
-    capability_id: string | null;
-    price_usdc: number | null;
-    savings_pct: number | null;
-    accepted: boolean;
-    message: string;
-  },
+  response: ResolveResponse,
   capabilityName?: string,
 ): TraceLine[] {
   const direct = response.estimated_direct_cost_usdc ?? 0.25;
@@ -16,13 +9,7 @@ export function buildResolveTrace(
   const savings = response.savings_pct ?? 96;
   const name = capabilityName || response.capability_id || "cap_circle_lockout";
 
-  return [
-    {
-      source: "ACE Console",
-      text: "CRITICAL: Spender wallet hit spend limit threshold. API transaction aborted.",
-      highlight: "rose",
-    },
-    { source: "Calculus", text: "Projecting direct trial-and-error recovery cost..." },
+  const lines: TraceLine[] = [
     {
       source: "Calculus",
       text: `Tokens needed: 120,000 recursive prompts. Key Lockout Risk: HIGH. Estimated Direct Cost: ~$${direct.toFixed(4)} USDC.`,
@@ -41,19 +28,21 @@ export function buildResolveTrace(
       highlight: response.accepted ? "mint" : "rose",
     },
   ];
-}
 
-export function buildPaymentTrace(): TraceLine[] {
-  return [
-    { source: "Payment", text: "Server returned HTTP 402 (Payment Required).", highlight: "rose" },
-    {
-      source: "Payment",
-      text: "Generating EIP-3009 Gas-Free Offline Signature via Circle Gateway...",
-      highlight: "cyan",
-    },
-    { source: "Payment", text: "Authorization accepted. Nanopayment settled off-chain.", highlight: "mint" },
-    { source: "Payment", text: "Downloading YAML decision tree..." },
-  ];
+  const traceLines = response.live_analysis?.trace_lines || [];
+  if (response.mode === "live" && traceLines.length > 0) {
+    lines.splice(
+      1,
+      0,
+      ...traceLines.slice(0, 3).map((text) => ({
+        source: "Calculus" as const,
+        text: `DeepSeek: ${text}`,
+        highlight: "cyan" as const,
+      })),
+    );
+  }
+
+  return lines;
 }
 
 export function buildExecutionTrace(): TraceLine[] {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 
 import TraceConsole from "@/components/TraceConsole";
@@ -24,16 +24,20 @@ export default function IncidentSandbox() {
     setShowPaymentOverlay,
     setLedger,
     setSavings,
+    setError,
+    error,
   } = useAceStore();
+
   const [resolvedId, setResolvedId] = useState<string | null>(null);
   const autoRun = useRef<boolean>(false);
 
+  // Mount: refresh ledger + savings
   useEffect(() => {
     listLedger().then(setLedger).catch(console.error);
     getSavings().then(setSavings).catch(console.error);
   }, [setLedger, setSavings]);
 
-  // Auto-proceed from ROI decision to payment + execution
+  // Auto-proceed: ROI → payment → execution (always auto on first trigger)
   useEffect(() => {
     if (resolvedId && autoRun.current) {
       autoRun.current = false;
@@ -44,11 +48,16 @@ export default function IncidentSandbox() {
     }
   }, [resolvedId]);
 
-  const injectOutage = async () => {
-    clearTrace();
+  const injectOutage = useCallback(async () => {
+    // If there's already a trace, reset before running again
+    if (trace.length > 0) {
+      clearTrace();
+      setResolvedId(null);
+      setError("sandbox", null);
+    }
+
     setAlert(true);
-    setLoading(true);
-    setResolvedId(null);
+    setLoading("sandbox", true);
     autoRun.current = true;
 
     appendTrace([
@@ -60,7 +69,6 @@ export default function IncidentSandbox() {
     ]);
 
     await new Promise((r) => setTimeout(r, 600));
-
     appendTrace([{ source: "Calculus", text: "Projecting direct trial-and-error recovery cost..." }]);
     await new Promise((r) => setTimeout(r, 500));
 
@@ -75,21 +83,25 @@ export default function IncidentSandbox() {
       if (response.accepted && response.capability_id) {
         setResolvedId(response.capability_id);
       } else {
-        setLoading(false);
+        setLoading("sandbox", false);
         setAlert(false);
         autoRun.current = false;
       }
     } catch (err) {
-      appendTrace([{ source: "Error", text: String(err), highlight: "rose" }]);
-      setLoading(false);
+      const msg = err instanceof Error ? err.message : String(err);
+      appendTrace([{ source: "Error", text: msg, highlight: "rose" }]);
+      setError("sandbox", msg);
+      setLoading("sandbox", false);
       setAlert(false);
       autoRun.current = false;
     }
-  };
+  }, [trace.length]);
 
-  const unlockAndExecute = async () => {
-    if (!resolvedId) return;
-    setLoading(true);
+  const unlockAndExecute = useCallback(async () => {
+    const id = resolvedId;
+    if (!id) return;
+
+    setLoading("sandbox", true);
     setShowPaymentOverlay(true);
 
     const paymentTrace: TraceLine[] = [
@@ -113,7 +125,7 @@ export default function IncidentSandbox() {
     appendTrace(paymentTrace);
 
     try {
-      const { capability, payload } = await paywallDownload(resolvedId);
+      const { capability, payload } = await paywallDownload(id);
       appendTrace([
         {
           source: "Payment",
@@ -123,11 +135,12 @@ export default function IncidentSandbox() {
         { source: "Payment", text: `Downloading capability ${capability.id}...` },
       ]);
     } catch (err) {
-      console.error("paywallDownload failed:", err);
-      appendTrace([{ source: "Error", text: String(err), highlight: "rose" }]);
+      const msg = err instanceof Error ? err.message : String(err);
+      appendTrace([{ source: "Error", text: msg, highlight: "rose" }]);
       setShowPaymentOverlay(false);
       setAlert(false);
-      setLoading(false);
+      setLoading("sandbox", false);
+      setError("sandbox", msg);
       return;
     }
 
@@ -135,40 +148,46 @@ export default function IncidentSandbox() {
     appendTrace(buildExecutionTrace());
 
     try {
-      const [ledger, savings] = await Promise.all([listLedger(), getSavings()]);
+      const [ledger, sv] = await Promise.all([listLedger(), getSavings()]);
       setLedger(ledger);
-      setSavings(savings);
+      setSavings(sv);
     } catch (err) {
       console.error("Failed to refresh ledger/savings:", err);
     }
 
-    setLoading(false);
+    setLoading("sandbox", false);
     setAlert(false);
-  };
+    setResolvedId(null);
+  }, [resolvedId]);
+
+  const busy = loading.sandbox;
+  const sandboxError = error.sandbox;
 
   return (
     <motion.div
       animate={alert ? { boxShadow: "0 0 30px rgba(244,63,94,0.25)" } : { boxShadow: "0 0 0 rgba(0,0,0,0)" }}
-      className="glass relative flex h-full min-h-[600px] flex-col rounded-xl p-4"
+      className="glass relative flex min-h-0 flex-1 flex-col rounded-xl p-4"
     >
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-ace-muted">Live Sandbox &amp; Traces</h2>
-        <div className="flex gap-2">
-          {resolvedId && (
-            <button
-              onClick={unlockAndExecute}
-              disabled={loading}
-              className="rounded bg-ace-cyan px-3 py-1.5 text-xs font-semibold text-black transition hover:bg-cyan-400 disabled:opacity-50"
+      <div className="mb-4 flex items-center justify-between max-sm:flex-col max-sm:items-start max-sm:gap-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-ace-muted">
+          Live Sandbox &amp; Traces
+        </h2>
+        <div className="flex flex-wrap gap-2">
+          {sandboxError && (
+            <span
+              className="rounded border border-rose-400/40 bg-rose-500/10 px-2 py-1.5 text-[10px] text-ace-rose"
+              role="alert"
             >
-              Re-run Unlock &amp; Execute
-            </button>
+              {sandboxError}
+            </span>
           )}
           <button
             onClick={injectOutage}
-            disabled={loading}
+            disabled={busy}
+            aria-label="Trigger a Circle spend-limit error incident"
             className="rounded bg-ace-rose px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-rose-600 disabled:opacity-50"
           >
-            {loading ? "Running..." : "Inject simulated lockout"}
+            {busy ? "Running..." : "Trigger Circle spend-limit error"}
           </button>
         </div>
       </div>

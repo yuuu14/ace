@@ -3,8 +3,10 @@ import type {
   CapabilitySummary,
   EIP712Authorization,
   LedgerEntry,
+  PaymentSignaturePayload,
   ResolveResponse,
   SavingsReport,
+  RuntimeStatus,
   X402Accept,
   X402Challenge,
 } from "./types";
@@ -118,14 +120,25 @@ export async function paywallDownload(
     message: authorization,
   };
 
-  const signature = signer ? await signer(typedData) : "0x" + "00".repeat(65);
+  let signature = signer ? await signer(typedData) : "";
+  let paymentPayload: unknown = null;
 
-  const paymentPayload = {
-    x402Version: 2,
-    payload: { signature, authorization },
-    accepted,
-    resource: challenge.resource,
-  };
+  if (signature) {
+    paymentPayload = {
+      x402Version: 2,
+      payload: { signature, authorization },
+      accepted,
+      resource: challenge.resource,
+    };
+  } else {
+    const purchase = (await purchaseCapability(id)) as {
+      payment_signature?: {
+        payload?: { signature?: string; authorization?: EIP712Authorization };
+      };
+    };
+    paymentPayload = purchase.payment_signature;
+    signature = purchase.payment_signature?.payload?.signature || "";
+  }
 
   const paidRes = await fetch(`${API_BASE}/capabilities/${id}/download`, {
     headers: { "payment-signature": b64encode(paymentPayload) },
@@ -137,7 +150,16 @@ export async function paywallDownload(
   }
 
   const capability = (await paidRes.json()) as Capability;
-  return { capability, challenge, payload: { signature, authorization } };
+  return {
+    capability,
+    challenge,
+    payload: {
+      signature,
+      authorization:
+        ((paymentPayload as PaymentSignaturePayload | null)?.payload.authorization as EIP712Authorization | undefined) ||
+        authorization,
+    },
+  };
 }
 
 export async function listLedger(): Promise<LedgerEntry[]> {
@@ -146,4 +168,8 @@ export async function listLedger(): Promise<LedgerEntry[]> {
 
 export async function getSavings(): Promise<SavingsReport> {
   return fetchJson<SavingsReport>("/ledger/savings");
+}
+
+export async function getRuntime(): Promise<RuntimeStatus> {
+  return fetchJson<RuntimeStatus>("/runtime");
 }

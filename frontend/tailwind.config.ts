@@ -10,17 +10,14 @@ const config: Config = {
     extend: {
       colors: {
         ace: {
-          bg: "#09090b",
-          panel: "#0f0f12",
-          border: "#27272a",
-          rose: "#f43f5e",
-          mint: "#10b981",
-          cyan: "#06b6d4",
-          muted: "#a1a1aa",
+          bg: "var(--ace-bg)",
+          panel: "var(--ace-panel)",
+          border: "var(--ace-border)",
+          rose: "var(--ace-rose)",
+          mint: "var(--ace-mint)",
+          cyan: "var(--ace-cyan)",
+          muted: "var(--ace-muted)",
         },
-      },
-      fontFamily: {
-        mono: ["ui-monospace", "SFMono-Regular", "Menlo", "Monaco", "Consolas", "monospace"],
       },
     },
   },

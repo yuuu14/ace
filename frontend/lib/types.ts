@@ -50,6 +50,15 @@ export interface ResolveResponse {
   estimated_direct_cost_usdc: number | null;
   savings_pct: number | null;
   decision_points: DecisionPoint[] | null;
+  mode: string;
+  live_analysis: {
+    summary?: string;
+    recommended_capability_id?: string | null;
+    confidence?: number;
+    rationale?: string;
+    trace_lines?: string[];
+    error?: string;
+  } | null;
   message: string;
 }
 
@@ -120,4 +129,14 @@ export interface X402Settlement {
   settlement_id: string;
   status: string;
   tx_hash: string | null;
+}
+
+export interface RuntimeStatus {
+  mode: string;
+  live: boolean;
+  llm_provider: string;
+  llm_model: string;
+  llm_configured: boolean;
+  chain_id: number;
+  x402_settlement_mode: string;
 }

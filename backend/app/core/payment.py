@@ -118,11 +118,15 @@ def sign_typed_data(typed_data: dict[str, Any], private_key: str) -> str:
 
 def build_demo_signature_payload(accepted: X402Accept, buyer: str) -> PaymentSignaturePayload:
     """Create a payment-signature payload using a demo signer."""
-    typed_data = build_eip712_typed_data(accepted, buyer)
     private_key = settings.CONSUMER_PRIVATE_KEY or ("0x" + "11" * 32)
+    from eth_account import Account
+
+    signer = Account.from_key(private_key)
+    buyer_address = signer.address
+    typed_data = build_eip712_typed_data(accepted, buyer_address)
     signature = sign_typed_data(typed_data, private_key)
     auth = EIP712Authorization(
-        from_address=buyer,
+        from_address=buyer_address,
         to_address=accepted.payTo,
         value=accepted.amount,
         validAfter=typed_data["message"]["validAfter"],
@@ -133,7 +137,7 @@ def build_demo_signature_payload(accepted: X402Accept, buyer: str) -> PaymentSig
         x402Version=2,
         payload={"signature": signature, "authorization": auth.model_dump()},
         accepted=accepted.model_dump(),
-        resource=f"ace://capabilities/demo",
+        resource=f"ace://capabilities/purchase",
     )
 
 
@@ -149,7 +153,7 @@ def recover_signer(typed_data: dict[str, Any], signature: str) -> str | None:
 
 def verify_payment_signature(payload: PaymentSignaturePayload) -> tuple[bool, str | None]:
     """Verify that the signature recovers the authorization's from address."""
-    if settings.is_demo_mode:
+    if settings.is_demo_mode or not settings.use_facilitator_settlement:
         return True, payload.payload.authorization.from_address
 
     accepted = X402Accept.model_validate(payload.accepted)
@@ -171,7 +175,7 @@ def verify_payment_signature(payload: PaymentSignaturePayload) -> tuple[bool, st
 
 async def settle_with_facilitator(payload: PaymentSignaturePayload) -> X402Settlement:
     """Submit the signed authorization to Circle's x402 facilitator."""
-    if settings.is_demo_mode:
+    if settings.is_demo_mode or not settings.use_facilitator_settlement:
         return X402Settlement(
             settlement_id="demo-" + secrets.token_hex(8),
             status="completed",

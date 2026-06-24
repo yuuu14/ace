@@ -1,41 +1,185 @@
-capability:
-  id: "cap_circle_lockout_recovery"
-  version: "1.0.0"
-  objective: "Recover and reset Circle wallet spending limits under OTP-dropped concurrency lockouts"
-  category: "RECOVERY"
-  price_usdc: 0.0020
+capabilities:
+  - id: "cap_circle_lockout_recovery"
+    version: "1.0.0"
+    objective: "Recover and reset Circle wallet spending limits under OTP-dropped concurrency lockouts"
+    category: "RECOVERY"
+    price_usdc: 0.0020
 
-  trigger_signatures:
-    - error_code: "402_LIMIT_EXCEEDED"
-    - terminal_log_pattern: "Error: CLI execution limit exceeded on stablecoin transfer"
+    trigger_signatures:
+      - error_code: "402_LIMIT_EXCEEDED"
+      - terminal_log_pattern: "Error: CLI execution limit exceeded on stablecoin transfer"
 
-  provenance_metrics:
-    experience_sources:
-      - chaos_test_runs
-      - replayed_failure_scenarios
-    sample_runs_analyzed: 15
-    average_latency_reduction_pct: 88.0
-    direct_token_saving_pct: 96.0
+    provenance_metrics:
+      experience_sources:
+        - chaos_test_runs
+        - replayed_failure_scenarios
+      sample_runs_analyzed: 15
+      average_latency_reduction_pct: 88.0
+      direct_token_saving_pct: 96.0
 
-  decision_points:
-    - condition: "wallet_status == SESSION_LOCKED"
-      action: "fetch_monotonic_nonce"
-      failsafe: "reset_local_nonce_to_onchain"
+    decision_points:
+      - condition: "wallet_status == SESSION_LOCKED"
+        action: "fetch_monotonic_nonce"
+        failsafe: "reset_local_nonce_to_onchain"
 
-    - condition: "last_execution_error == invalid_nonce"
-      action: "force_sync_block_header"
+      - condition: "last_execution_error == invalid_nonce"
+        action: "force_sync_block_header"
 
-    - condition: "transaction_dropped == true"
-      action: "sequence_traverse_fallback_rpc"
+      - condition: "transaction_dropped == true"
+        action: "sequence_traverse_fallback_rpc"
 
-    - condition: "spend_limit_exceeded == true"
-      action: "generate_limit_reset_policy"
-      params:
-        per_tx: 1
-        daily: 5
-      security_policy: "delegate_otp_to_admin_without_storing_in_agent_memory"
+      - condition: "spend_limit_exceeded == true"
+        action: "generate_limit_reset_policy"
+        params:
+          per_tx: 1
+          daily: 5
+        security_policy: "delegate_otp_to_admin_without_storing_in_agent_memory"
 
-  attestation:
-    auditor_address: "0x000000000000000000000000000000000000ACE1"
-    timestamp: 1782297600
-    signature: "0x48f57fa673e13d9a1c120bf39da128ae3901bc97fa0e39c6395ba7f230da1d0172"
+    attestation:
+      auditor_address: "0x000000000000000000000000000000000000ACE1"
+      timestamp: 1782297600
+      signature: "0x48f57fa673e13d9a1c120bf39da128ae3901bc97fa0e39c6395ba7f230da1d0172"
+
+  - id: "cap_arc_nonce_rebalance"
+    version: "1.0.0"
+    objective: "Rebalance Arc testnet nonce drift after multi-RPC transaction fanout"
+    category: "RPC"
+    price_usdc: 0.0014
+
+    trigger_signatures:
+      - error_code: "NONCE_TOO_LOW"
+      - error_code: "REPLACEMENT_UNDERPRICED"
+      - terminal_log_pattern: "nonce too low after fallback rpc"
+
+    provenance_metrics:
+      experience_sources:
+        - forked_rpc_replays
+        - mempool_shadow_runs
+      sample_runs_analyzed: 24
+      average_latency_reduction_pct: 81.0
+      direct_token_saving_pct: 91.0
+
+    decision_points:
+      - condition: "rpc_divergence == true"
+        action: "sample_nonce_across_rpc_quorum"
+        failsafe: "pin_to_highest_confirmed_nonce"
+
+      - condition: "pending_tx_count == elevated"
+        action: "cancel_stale_authorizations"
+
+      - condition: "replacement_underpriced == true"
+        action: "reprice_with_gateway_floor"
+        params:
+          multiplier: 1.18
+
+    attestation:
+      auditor_address: "0x000000000000000000000000000000000000ACE4"
+      timestamp: 1782297800
+      signature: "0x7f17a9e19691c8bbd0f2856319b60d2aa51f987ed8586b7110cf1402bbd70a51"
+
+  - id: "cap_x402_facilitator_retry"
+    version: "1.0.0"
+    objective: "Recover x402 facilitator settlement after stale EIP-712 authorization windows"
+    category: "PAYMENT"
+    price_usdc: 0.0018
+
+    trigger_signatures:
+      - error_code: "X402_STALE_AUTHORIZATION"
+      - error_code: "FACILITATOR_400"
+      - terminal_log_pattern: "validBefore expired before settlement"
+
+    provenance_metrics:
+      experience_sources:
+        - facilitator_error_corpus
+        - signed_payload_replays
+      sample_runs_analyzed: 19
+      average_latency_reduction_pct: 76.0
+      direct_token_saving_pct: 89.0
+
+    decision_points:
+      - condition: "settlement_status == rejected"
+        action: "decode_facilitator_rejection"
+
+      - condition: "authorization_window == stale"
+        action: "regenerate_transfer_with_authorization"
+        params:
+          valid_before_seconds: 605100
+
+      - condition: "asset_mismatch == true"
+        action: "rebuild_payment_required_accept_header"
+        failsafe: "downgrade_to_local_settlement_record"
+
+    attestation:
+      auditor_address: "0x000000000000000000000000000000000000ACE5"
+      timestamp: 1782297900
+      signature: "0x9a0870d093aa00ca48c0058457c6df3db2b721d364dd91a1398fa75ba4da4c4c"
+
+  - id: "cap_kyc_webhook_replay"
+    version: "1.0.0"
+    objective: "Replay missed KYC webhook transitions without duplicating user verification state"
+    category: "COMPLIANCE"
+    price_usdc: 0.0032
+
+    trigger_signatures:
+      - error_code: "KYC_WEBHOOK_GAP"
+      - terminal_log_pattern: "verification state skipped from pending to unknown"
+
+    provenance_metrics:
+      experience_sources:
+        - webhook_dead_letter_queues
+        - compliance_sandbox_runs
+      sample_runs_analyzed: 31
+      average_latency_reduction_pct: 69.0
+      direct_token_saving_pct: 84.0
+
+    decision_points:
+      - condition: "webhook_sequence_gap == true"
+        action: "load_provider_event_cursor"
+        failsafe: "isolate_dead_letter_batch"
+
+      - condition: "idempotency_key_seen == false"
+        action: "replay_missing_verification_event"
+
+      - condition: "state_transition_valid == false"
+        action: "hold_for_manual_compliance_review"
+        security_policy: "never_auto_approve_identity_documents"
+
+    attestation:
+      auditor_address: "0x000000000000000000000000000000000000ACE6"
+      timestamp: 1782298000
+      signature: "0xb4585a1ab3f2cef5128b06afaa756b0f4549fe73695d019a5348174e4e0a19bd"
+
+  - id: "cap_vault_policy_rollback"
+    version: "1.0.0"
+    objective: "Rollback malformed treasury vault policy updates after partial multisig approval"
+    category: "GOVERNANCE"
+    price_usdc: 0.0045
+
+    trigger_signatures:
+      - error_code: "POLICY_ROLLBACK_REQUIRED"
+      - terminal_log_pattern: "multisig threshold accepted malformed spend policy"
+
+    provenance_metrics:
+      experience_sources:
+        - vault_policy_diffs
+        - signer_threshold_simulations
+      sample_runs_analyzed: 12
+      average_latency_reduction_pct: 73.0
+      direct_token_saving_pct: 87.0
+
+    decision_points:
+      - condition: "policy_hash_changed == true"
+        action: "diff_policy_against_last_attested_hash"
+
+      - condition: "approval_threshold_met == partial"
+        action: "freeze_new_spend_authorizations"
+        security_policy: "require_two_admin_signatures_for_unfreeze"
+
+      - condition: "rollback_candidate_valid == true"
+        action: "submit_policy_rollback_bundle"
+        failsafe: "open_time_locked_recovery_proposal"
+
+    attestation:
+      auditor_address: "0x000000000000000000000000000000000000ACE7"
+      timestamp: 1782298100
+      signature: "0x3770e754245ed6c9e5f0d79855e3d2ab24e29e2f7a01e8c0ac7b3e4a398dd52e"

@@ -23,4 +23,6 @@ class ResolveResponse(BaseModel):
     estimated_direct_cost_usdc: float | None = None
     savings_pct: float | None = None
     decision_points: list[dict] | None = None
+    mode: str = "demo"
+    live_analysis: dict | None = None
     message: str

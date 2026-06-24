@@ -1,23 +1,40 @@
 "use client";
 
-import { useEffect } from "react";
-
 import { useAceStore } from "@/store/useAceStore";
-import { listLedger } from "@/lib/api";
 
 export default function LedgerPanel() {
-  const { ledger, setLedger } = useAceStore();
-
-  useEffect(() => {
-    listLedger().then(setLedger).catch(console.error);
-  }, [setLedger]);
+  const { ledger, loading, error } = useAceStore();
 
   return (
-    <div className="glass rounded-xl p-4">
+    <div className="glass flex min-h-0 flex-1 flex-col rounded-xl p-4">
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-ace-muted">
         Nanopayment Ledger
       </h2>
-      <div className="max-h-64 overflow-y-auto space-y-2">
+
+      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
+        {/* Loading */}
+        {loading.ledger && ledger.length === 0 && (
+          <div className="flex items-center justify-center gap-2 py-8" role="status" aria-label="Loading ledger">
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-ace-cyan border-t-transparent" aria-hidden="true" />
+            <span className="text-xs text-ace-muted">Loading…</span>
+          </div>
+        )}
+
+        {/* Error */}
+        {error.ledger && (
+          <div className="rounded border border-rose-400/30 bg-rose-500/10 p-3 text-center text-xs text-ace-rose" role="alert">
+            {error.ledger}
+          </div>
+        )}
+
+        {/* Empty */}
+        {!loading.ledger && !error.ledger && ledger.length === 0 && (
+          <div className="flex items-center justify-center py-8 text-xs text-ace-muted" role="status">
+            No nanopayment transactions yet.
+          </div>
+        )}
+
+        {/* Entries */}
         {ledger.map((entry) => (
           <div
             key={entry.id}
@@ -33,9 +50,6 @@ export default function LedgerPanel() {
             </div>
           </div>
         ))}
-        {ledger.length === 0 && (
-          <div className="text-xs text-ace-muted">No nanopayment transactions yet.</div>
-        )}
       </div>
     </div>
   );

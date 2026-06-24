@@ -16,6 +16,7 @@ class Settings(BaseSettings):
 
     # Circle x402 Gateway configuration
     CIRCLE_FACILITATOR_URL: str = "https://gateway-api-testnet.circle.com"
+    X402_SETTLEMENT_MODE: str = "demo"  # "demo" or "facilitator"
     GATEWAY_WALLET_CONTRACT: str = "0x0077777d7EBA4688BDeF3E311b846F25870A19B9"
     USDC_CONTRACT: str = "0x000000000000000000000000000000000000ACE2"
     SELLER_ADDRESS: str = "0x000000000000000000000000000000000000ACE3"
@@ -46,6 +47,10 @@ class Settings(BaseSettings):
     @property
     def is_live_mode(self) -> bool:
         return self.ACE_MODE.lower() == "live"
+
+    @property
+    def use_facilitator_settlement(self) -> bool:
+        return self.X402_SETTLEMENT_MODE.lower() == "facilitator"
 
     class Config:
         env_file = ".env"
